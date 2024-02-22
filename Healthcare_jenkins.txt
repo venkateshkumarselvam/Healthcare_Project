@@ -1,0 +1,68 @@
+pipeline {
+    agent { label 'slave1' }	
+
+    tools {
+   
+        maven 'Maven'
+    }
+
+	environment {	
+		DOCKERHUB_CREDENTIALS=credentials('Docker_Cred')
+	} 
+    
+    stages {
+        stage('SCM Checkout') {
+            steps {
+              
+                git 'https://github.com/venkateshkumarselvam/Healthcare_Project.git'
+            }
+		}
+        stage('Maven Build') {
+            steps {
+                // Run Maven on a Unix agent.
+                sh "mvn -Dmaven.test.failure.ignore=true clean package"
+            }
+		}
+       stage("Docker build"){
+            steps {
+				sh 'docker version'
+				sh "docker build -t venkt06/healthapp-w1-app:${BUILD_NUMBER} ."
+				sh 'docker image list'
+				sh "docker tag venkt06/healthapp-w1-app:${BUILD_NUMBER} venkt06/healthapp-w1-app:latest"
+            }
+        }
+		stage('Login_to_DockerHub') {
+
+			steps {
+				sh 'echo $DOCKERHUB_CREDENTIALS_PSW | docker login -u $DOCKERHUB_CREDENTIALS_USR --password-stdin'
+			}
+		}
+		stage('Push_to_DockerHub') {
+
+			steps {
+				sh "docker push venkt06/healthapp-w1-app:${BUILD_NUMBER}"
+			}
+		}
+        stage('Change Image Tag') {
+            steps {
+                script {
+                    sh "chmod +x change_image_tag_healthcare.sh"
+                    sh "./change_image_tag_healthcare.sh ${BUILD_NUMBER}"
+                }
+            }
+        }
+        stage('Deploy to Kubernetes Developer Environment') {
+            steps {
+		script {
+		sshPublisher(publishers: [sshPublisherDesc(configName: 'Kubenetes', transfers: [sshTransfer(cleanRemote: false, excludes: '', execCommand: 'kubectl apply -f k8s_deployment_healthcare.yaml', execTimeout: 120000, flatten: false, makeEmptyDirs: false, noDefaultExcludes: false, patternSeparator: '[, ]+', remoteDirectory: '.', remoteDirectorySDF: false, removePrefix: '', sourceFiles: '*.yaml')], usePromotionTimestamp: false, useWorkspaceInPromotion: false, verbose: false)])
+		       }
+            }
+    	}
+      }
+	   post {
+                success {		
+                    mail bcc: '', body: "Please go to ${BUILD_URL} and verify the build", cc: '', from: '', replyTo: '', subject: "Job \'${JOB_NAME}\' (${BUILD_NUMBER}) was completed with the status of  \'${currentBuild.result}", to: 'doarex6@gmail.com'
+
+			 }
+	 }
+	}
