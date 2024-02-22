@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: healthapp-project
   labels:
-    app: bankapp-w1
+    app: healthapp-w1
 spec:
   replicas: 3
   strategy:
