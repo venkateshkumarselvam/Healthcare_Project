@@ -1,4 +1,5 @@
 #!/bin/bash
+
 # Extract the tag name from the command-line argument
 NEW_TAG="$1"
 # Replace the image tag in the Kubernetes YAML file
